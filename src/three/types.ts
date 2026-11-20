@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type ExperienceStage = 'intro' | 'growing' | 'assembly' | 'teddy' | 'final';
+export type ExperienceStage = 'intro' | 'growing' | 'assembly' | 'giftbox' | 'teddy' | 'final';
 
 export type LightingMood = 'morning' | 'golden' | 'starlight';
 
@@ -186,12 +186,64 @@ export interface DisposableResource {
   dispose: () => void;
 }
 
+export interface BubbleScreenCoords {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
+export type DialogueSpeaker = 'pikachu' | 'laddu' | 'shinchan' | null;
+
+export const HEART_MESSAGE_PRESETS = [
+  'Always Yours',
+  'Forever ♡',
+  'My Princess',
+  'Hug Me ♡',
+  'Love You',
+] as const;
+
+export interface PolaroidMemorySpec {
+  id: string;
+  caption: string;
+  imageDataUrl?: string;
+}
+
+export interface AccessorySelection {
+  flowerCrown: boolean;
+  partyHat: boolean;
+  bowtie: boolean;
+  heartShades: boolean;
+}
+
+export const DEFAULT_ACCESSORIES: AccessorySelection = {
+  flowerCrown: true,
+  partyHat: false,
+  bowtie: false,
+  heartShades: false,
+};
+
 export interface SceneCallbacks {
   onStageChange?: (stage: ExperienceStage) => void;
   onHugBurst?: (isDoubleTap?: boolean) => void;
+  onCelebrateBurst?: () => void;
   onPikachuTap?: () => void;
+  onPikachuDoubleSpark?: () => void;
+  onLadduTap?: () => void;
+  onShinchanTap?: (isDoubleTap?: boolean) => void;
+  onHeartTextCycle?: (text: string) => void;
+  onPolaroidSelect?: (memory: PolaroidMemorySpec) => void;
+  onLanternRelease?: () => void;
+  onWishCast?: () => void;
+  onBalloonPop?: () => void;
+  onDialogueChange?: (speaker: DialogueSpeaker) => void;
+  onBubbleProject?: (coords: {
+    pikachu: BubbleScreenCoords;
+    laddu: BubbleScreenCoords;
+    shinchan: BubbleScreenCoords;
+  }) => void;
   onTulipSelect?: (tulip: TulipShadeSpec) => void;
   onEnvelopeOpen?: () => void;
+  onGiftBoxOpen?: () => void;
 }
 
 export interface ThreeTextureBundle {

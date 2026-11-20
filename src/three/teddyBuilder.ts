@@ -12,6 +12,8 @@ export interface TeddyRig {
   leftEarPivot: THREE.Group;
   rightEarPivot: THREE.Group;
   heartGroup: THREE.Group;
+  heartMesh: THREE.Mesh;
+  setHeartText: (text: string) => void;
   state: {
     walkCycle: number; // phase for walking bounce
     walkWeight: number; // 0 = still, 1 = walking
@@ -20,6 +22,7 @@ export interface TeddyRig {
     heartLift: number; // 0 = tucked, 1 = warmly presented
     hugPulse: number; // celebratory hug lean/bounce
     kissPulse: number; // extra double-tap joyful bounce & tilt
+    danceWeight: number; // 0 = calm, 1 = rhythmic group dance
   };
   updatePose: (elapsed: number) => void;
   dispose: () => void;
@@ -395,7 +398,7 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
   const leftArmPivot = createArm(-1);
   const rightArmPivot = createArm(1);
 
-  // 4. Sculpted Plush Pink Heart held visibly between both Teddy paws
+  // 4. Sculpted Plush Pink Heart with Embossed Conversation Text
   const heartGroup = new THREE.Group();
   heartGroup.position.set(0, 0.04, 0.5);
   bodyPivot.add(heartGroup);
@@ -405,6 +408,63 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
   heartMesh.castShadow = true;
   heartMesh.receiveShadow = true;
   heartGroup.add(heartMesh);
+
+  // Embossed front text plane aligned to front face of plush heart
+  const heartTextCanvas = document.createElement('canvas');
+  heartTextCanvas.width = 512;
+  heartTextCanvas.height = 512;
+  const heartTextTex = new THREE.CanvasTexture(heartTextCanvas);
+  heartTextTex.colorSpace = THREE.SRGBColorSpace;
+  disposables.push(heartTextTex);
+
+  const paintHeartText = (label: string) => {
+    const ctx = heartTextCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 512, 512);
+
+    // Subtle recessed candy-heart border highlight
+    const clean = (label || 'Always Yours').trim().slice(0, 18);
+    const words = clean.split(/\s+/);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Embossed shadow + crisp cream-gold stitched lettering
+    const drawLines = (lines: string[], fontSize: number) => {
+      ctx.font = `italic 700 ${fontSize}px Georgia, serif`;
+      const lineHeight = fontSize * 1.15;
+      const startY = 248 - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, idx) => {
+        const ly = startY + idx * lineHeight;
+        ctx.fillStyle = 'rgba(105, 22, 52, 0.55)';
+        ctx.fillText(line, 256, ly + 4);
+        ctx.fillStyle = '#fff5f8';
+        ctx.fillText(line, 256, ly);
+      });
+    };
+
+    if (words.length >= 2 && clean.length > 9) {
+      const mid = Math.ceil(words.length / 2);
+      drawLines([words.slice(0, mid).join(' '), words.slice(mid).join(' ')], 60);
+    } else {
+      drawLines([clean], clean.length > 10 ? 54 : 66);
+    }
+    heartTextTex.needsUpdate = true;
+  };
+  paintHeartText('Always Yours');
+
+  const heartTextMat = trackMat(
+    new THREE.MeshBasicMaterial({
+      map: heartTextTex,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    })
+  );
+  const heartTextPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(0.36, 0.36)), heartTextMat);
+  heartTextPlane.position.set(0, 0.015, 0.095);
+  heartGroup.add(heartTextPlane);
 
   // 5. Complete Articulated Legs & Feet with Stitched Paw Pads + Toe Beans
   const legGeo = trackGeo(createPlushLimbGeometry(0.42, 0.145, 0.135, 0.15));
@@ -456,6 +516,7 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     heartLift: 1,
     hugPulse: 0,
     kissPulse: 0,
+    danceWeight: 0,
   };
 
   function updatePose(elapsed: number) {
@@ -464,41 +525,42 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     const wave = THREE.MathUtils.clamp(state.waveAmount, 0, 1);
     const hug = state.hugPulse;
     const kiss = state.kissPulse;
+    const dance = THREE.MathUtils.clamp(state.danceWeight, 0, 1);
+
+    const danceBeat = Math.sin(elapsed * 7.2);
+    const danceBounce = Math.abs(Math.sin(elapsed * 3.6)) * 0.095 * dance;
 
     // Gentle breathing
     const breath = Math.sin(elapsed * 2.1) * 0.012;
 
-    // Body height:
-    // Standing: feet bottom at y = -0.25 - 0.37 - 0.13 = -0.75 below bodyPivot -> bodyPivot.y = 0.75
-    // Seated: torso bottom at y = -0.36 below bodyPivot -> bodyPivot.y = 0.365
     const standY = 0.75 + Math.abs(Math.sin(state.walkCycle)) * 0.08 * walk;
     const sitY = 0.365;
-    bodyPivot.position.y = THREE.MathUtils.lerp(standY, sitY, sit) + hug * 0.12 + kiss * 0.18;
+    bodyPivot.position.y = THREE.MathUtils.lerp(standY, sitY, sit) + hug * 0.12 + kiss * 0.18 + danceBounce;
     bodyPivot.rotation.x =
       walk * 0.08 +
       sit * -0.05 +
       hug * 0.16 +
       kiss * 0.22 +
       Math.sin(elapsed * 1.4) * 0.02 * sit;
-    bodyPivot.rotation.z = Math.sin(state.walkCycle) * 0.05 * walk;
+    bodyPivot.rotation.z = Math.sin(state.walkCycle) * 0.05 * walk + danceBeat * 0.085 * dance;
 
     // Head tilt & affectionate nod
     headPivot.rotation.z =
       Math.sin(elapsed * 1.1) * 0.055 +
       Math.cos(state.walkCycle) * 0.04 * walk +
-      kiss * 0.16;
+      kiss * 0.16 -
+      danceBeat * 0.12 * dance;
     headPivot.rotation.y = Math.sin(elapsed * 0.85) * 0.07;
     headPivot.rotation.x = breath * 1.5 - hug * 0.12 - kiss * 0.18;
 
     // Subtle ear bounce
-    leftEarPivot.rotation.z = 0.38 + Math.sin(state.walkCycle * 2) * 0.06 * walk + hug * 0.08 + kiss * 0.14;
-    rightEarPivot.rotation.z = -0.38 - Math.sin(state.walkCycle * 2) * 0.06 * walk - hug * 0.08 - kiss * 0.14;
+    leftEarPivot.rotation.z = 0.38 + Math.sin(state.walkCycle * 2) * 0.06 * walk + hug * 0.08 + kiss * 0.14 + Math.abs(danceBeat) * 0.12 * dance;
+    rightEarPivot.rotation.z = -0.38 - Math.sin(state.walkCycle * 2) * 0.06 * walk - hug * 0.08 - kiss * 0.14 - Math.abs(danceBeat) * 0.12 * dance;
 
-    // Legs:
-    // Standing/walking swings around X; Seated swings forward (-1.28 rad) and splays softly (±0.32 rad)
+    // Legs
     const walkLegSwing = Math.sin(state.walkCycle) * 0.42 * walk;
-    leftLegPivot.rotation.x = THREE.MathUtils.lerp(walkLegSwing, -1.24, sit);
-    rightLegPivot.rotation.x = THREE.MathUtils.lerp(-walkLegSwing, -1.24, sit);
+    leftLegPivot.rotation.x = THREE.MathUtils.lerp(walkLegSwing, -1.24, sit) + danceBeat * 0.14 * dance;
+    rightLegPivot.rotation.x = THREE.MathUtils.lerp(-walkLegSwing, -1.24, sit) - danceBeat * 0.14 * dance;
     leftLegPivot.rotation.z = THREE.MathUtils.lerp(0.05, 0.24, sit);
     rightLegPivot.rotation.z = THREE.MathUtils.lerp(-0.05, -0.24, sit);
     leftLegPivot.rotation.y = THREE.MathUtils.lerp(0, 0.22, sit);
@@ -507,18 +569,16 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     // Arms cradling the left & right edges of the heart vs walking vs welcoming wave
     const walkArmSwing = Math.sin(state.walkCycle) * 0.32 * walk;
     const holdMix = Math.max(sit, state.heartLift * 0.8);
-    // Left arm cradles left edge of heart clearly
     leftArmPivot.rotation.x = THREE.MathUtils.lerp(-0.68 - walkArmSwing, -1.04 - hug * 0.22 - kiss * 0.12, holdMix);
-    leftArmPivot.rotation.z = THREE.MathUtils.lerp(0.14, 0.32, holdMix);
+    leftArmPivot.rotation.z = THREE.MathUtils.lerp(0.14, 0.32, holdMix) + danceBeat * 0.14 * dance;
 
-    // Right arm cradles right edge of heart clearly, or waves warmly when waveAmount > 0
     const holdRightX = -1.04 - hug * 0.22 - kiss * 0.12;
     const holdRightZ = -0.32;
     const waveRightX = -0.35;
     const waveRightZ = 2.15 + Math.sin(elapsed * 5.2) * 0.24;
 
     const baseRightX = THREE.MathUtils.lerp(-0.68 + walkArmSwing, holdRightX, holdMix);
-    const baseRightZ = THREE.MathUtils.lerp(-0.14, holdRightZ, holdMix);
+    const baseRightZ = THREE.MathUtils.lerp(-0.14, holdRightZ, holdMix) + danceBeat * 0.14 * dance;
 
     rightArmPivot.rotation.x = THREE.MathUtils.lerp(baseRightX, waveRightX, wave);
     rightArmPivot.rotation.z = THREE.MathUtils.lerp(baseRightZ, waveRightZ, wave);
@@ -527,13 +587,13 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     const hl = THREE.MathUtils.clamp(state.heartLift, 0, 1);
     heartGroup.visible = hl > 0.02;
     heartGroup.position.set(
-      wave * -0.04,
+      wave * -0.04 + danceBeat * 0.045 * dance,
       THREE.MathUtils.lerp(-0.04, 0.05, hl) + breath * 0.8 + hug * 0.09 + kiss * 0.11,
       THREE.MathUtils.lerp(0.4, 0.49, hl)
     );
-    heartGroup.scale.setScalar(hl * (1 + Math.sin(elapsed * 2.8) * 0.03 + hug * 0.14));
+    heartGroup.scale.setScalar(hl * (1 + Math.sin(elapsed * 2.8) * 0.03 + hug * 0.14 + Math.abs(danceBeat) * 0.08 * dance));
     heartGroup.rotation.y = Math.sin(elapsed * 1.2) * 0.08;
-    heartGroup.rotation.z = Math.cos(elapsed * 1.1) * 0.05;
+    heartGroup.rotation.z = Math.cos(elapsed * 1.1) * 0.05 + danceBeat * 0.1 * dance;
   }
 
   updatePose(0);
@@ -549,6 +609,8 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     leftEarPivot,
     rightEarPivot,
     heartGroup,
+    heartMesh,
+    setHeartText: paintHeartText,
     state,
     updatePose,
     dispose: () => {
