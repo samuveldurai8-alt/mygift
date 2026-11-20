@@ -364,21 +364,29 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
   const leftEarPivot = createEar(-1);
   const rightEarPivot = createEar(1);
 
-  // 3. Articulated Arms + Paw Pads
-  const armGeo = trackGeo(createPlushLimbGeometry(0.48, 0.115, 0.105, 0.125));
+  // 3. Articulated Arms + Sculpted Plush Paws & Paw Pads
+  const armGeo = trackGeo(createPlushLimbGeometry(0.47, 0.115, 0.108, 0.122));
   const createArm = (side: -1 | 1): THREE.Group => {
     const pivot = new THREE.Group();
-    pivot.position.set(side * 0.34, 0.28, 0.05);
+    pivot.position.set(side * 0.39, 0.27, 0.08);
 
     const mesh = new THREE.Mesh(armGeo, furMat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     pivot.add(mesh);
 
-    // Cute soft pink paw pad on inner palm
+    // Rounded plush hand/paw at wrist end so both hands read clearly
+    const pawMesh = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.132, 18, 16)), furMat);
+    pawMesh.scale.set(0.96, 1.08, 1.02);
+    pawMesh.position.set(0, -0.45, 0.015);
+    pawMesh.castShadow = true;
+    pawMesh.receiveShadow = true;
+    pivot.add(pawMesh);
+
+    // Cute soft pink paw pad on inner-front palm
     const pawPad = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.072, 14, 12)), padMat);
-    pawPad.scale.set(0.9, 1.05, 0.45);
-    pawPad.position.set(-side * 0.04, -0.42, 0.065);
+    pawPad.scale.set(0.45, 1.0, 0.92);
+    pawPad.position.set(-side * 0.095, -0.455, 0.045);
     pivot.add(pawPad);
 
     bodyPivot.add(pivot);
@@ -387,12 +395,13 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
   const leftArmPivot = createArm(-1);
   const rightArmPivot = createArm(1);
 
-  // 4. Sculpted Plush Pink Heart held in front of Teddy's chest
+  // 4. Sculpted Plush Pink Heart held visibly between both Teddy paws
   const heartGroup = new THREE.Group();
-  heartGroup.position.set(0, 0.04, 0.52);
+  heartGroup.position.set(0, 0.04, 0.5);
   bodyPivot.add(heartGroup);
 
   const heartMesh = new THREE.Mesh(trackGeo(createHeartGeometry()), heartMat);
+  heartMesh.scale.setScalar(0.92);
   heartMesh.castShadow = true;
   heartMesh.receiveShadow = true;
   heartGroup.add(heartMesh);
@@ -495,31 +504,32 @@ export function createTeddyBear(textures: ThreeTextureBundle): TeddyRig {
     leftLegPivot.rotation.y = THREE.MathUtils.lerp(0, 0.22, sit);
     rightLegPivot.rotation.y = THREE.MathUtils.lerp(0, -0.22, sit);
 
-    // Arms cradling heart vs walking vs welcoming wave!
+    // Arms cradling the left & right edges of the heart vs walking vs welcoming wave
     const walkArmSwing = Math.sin(state.walkCycle) * 0.32 * walk;
-    // Left arm cradles heart warmly
-    leftArmPivot.rotation.x = THREE.MathUtils.lerp(-0.62 - walkArmSwing, -0.92 - hug * 0.25, Math.max(sit, state.heartLift * 0.8));
-    leftArmPivot.rotation.z = THREE.MathUtils.lerp(0.18, 0.48, Math.max(sit, state.heartLift * 0.8));
+    const holdMix = Math.max(sit, state.heartLift * 0.8);
+    // Left arm cradles left edge of heart clearly
+    leftArmPivot.rotation.x = THREE.MathUtils.lerp(-0.68 - walkArmSwing, -1.04 - hug * 0.22 - kiss * 0.12, holdMix);
+    leftArmPivot.rotation.z = THREE.MathUtils.lerp(0.14, 0.32, holdMix);
 
-    // Right arm cradles heart, or waves warmly when waveAmount > 0!
-    const holdRightX = -0.92 - hug * 0.25;
-    const holdRightZ = -0.48;
+    // Right arm cradles right edge of heart clearly, or waves warmly when waveAmount > 0
+    const holdRightX = -1.04 - hug * 0.22 - kiss * 0.12;
+    const holdRightZ = -0.32;
     const waveRightX = -0.35;
     const waveRightZ = 2.15 + Math.sin(elapsed * 5.2) * 0.24;
 
-    const baseRightX = THREE.MathUtils.lerp(-0.62 + walkArmSwing, holdRightX, Math.max(sit, state.heartLift * 0.8));
-    const baseRightZ = THREE.MathUtils.lerp(-0.18, holdRightZ, Math.max(sit, state.heartLift * 0.8));
+    const baseRightX = THREE.MathUtils.lerp(-0.68 + walkArmSwing, holdRightX, holdMix);
+    const baseRightZ = THREE.MathUtils.lerp(-0.14, holdRightZ, holdMix);
 
     rightArmPivot.rotation.x = THREE.MathUtils.lerp(baseRightX, waveRightX, wave);
     rightArmPivot.rotation.z = THREE.MathUtils.lerp(baseRightZ, waveRightZ, wave);
 
-    // Plush Pink Heart nestled cleanly between paws
+    // Plush Pink Heart nestled cleanly between both paws
     const hl = THREE.MathUtils.clamp(state.heartLift, 0, 1);
     heartGroup.visible = hl > 0.02;
     heartGroup.position.set(
-      wave * -0.05,
-      THREE.MathUtils.lerp(-0.05, 0.06, hl) + breath * 0.8 + hug * 0.09,
-      THREE.MathUtils.lerp(0.38, 0.50, hl)
+      wave * -0.04,
+      THREE.MathUtils.lerp(-0.04, 0.05, hl) + breath * 0.8 + hug * 0.09 + kiss * 0.11,
+      THREE.MathUtils.lerp(0.4, 0.49, hl)
     );
     heartGroup.scale.setScalar(hl * (1 + Math.sin(elapsed * 2.8) * 0.03 + hug * 0.14));
     heartGroup.rotation.y = Math.sin(elapsed * 1.2) * 0.08;

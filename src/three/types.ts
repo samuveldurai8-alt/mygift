@@ -189,6 +189,7 @@ export interface DisposableResource {
 export interface SceneCallbacks {
   onStageChange?: (stage: ExperienceStage) => void;
   onHugBurst?: (isDoubleTap?: boolean) => void;
+  onPikachuTap?: () => void;
   onTulipSelect?: (tulip: TulipShadeSpec) => void;
   onEnvelopeOpen?: () => void;
 }

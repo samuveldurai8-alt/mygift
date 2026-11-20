@@ -87,7 +87,7 @@ export default function App() {
   const [muted, setMuted] = useState(false);
   const [noteOpen, setNoteOpen] = useState(true);
   const [hugCount, setHugCount] = useState(0);
-  const [hugFeedback, setHugFeedback] = useState<'hug' | 'kiss' | null>(null);
+  const [hugFeedback, setHugFeedback] = useState<'hug' | 'kiss' | 'pika' | null>(null);
 
   // Interactive 3D Surprises & Keepsake Customization state
   const [mood, setMood] = useState<LightingMood>(initial.mood);
@@ -130,6 +130,15 @@ export default function App() {
         audioRef.current?.playHugChime();
         setHugCount((c) => c + 1);
         setHugFeedback(isDoubleTap ? 'kiss' : 'hug');
+        if (hugTimerRef.current) window.clearTimeout(hugTimerRef.current);
+        hugTimerRef.current = window.setTimeout(() => {
+          setHugFeedback(null);
+        }, 3000);
+      },
+      onPikachuTap: () => {
+        audioRef.current?.playHugChime();
+        setHugCount((c) => c + 1);
+        setHugFeedback('pika');
         if (hugTimerRef.current) window.clearTimeout(hugTimerRef.current);
         hugTimerRef.current = window.setTimeout(() => {
           setHugFeedback(null);
@@ -604,7 +613,11 @@ export default function App() {
                     </button>
 
                     <div className="min-h-4 flex items-center justify-center">
-                      {hugFeedback === 'kiss' ? (
+                      {hugFeedback === 'pika' ? (
+                        <span className="font-handwritten text-sm text-[#b33864]">
+                          Pikachu sent you a bright spark of joy, {displayName}! ({hugCount}) ⚡♡
+                        </span>
+                      ) : hugFeedback === 'kiss' ? (
                         <span className="font-handwritten text-sm text-[#b33864]">
                           Teddy sent you an extra big hug & kiss, {displayName}! ({hugCount}) ♡
                         </span>
@@ -614,7 +627,7 @@ export default function App() {
                         </span>
                       ) : (
                         <span className="text-[11px] text-[#8d5a6e]/85">
-                          Tap any tulip for a note, double-tap teddy for a kiss, or open the wax envelope
+                          Tap Pikachu, teddy, any tulip, or the wax-sealed envelope ♡
                         </span>
                       )}
                     </div>

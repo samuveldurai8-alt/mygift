@@ -6,6 +6,7 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { createBouquetRig, type BouquetRig } from './bouquetBuilder';
 import { createEnvelope, type EnvelopeRig } from './envelopeBuilder';
 import { createParticleSystem, type ParticleSystem } from './particles';
+import { createPikachu, type PikachuRig } from './pikachuBuilder';
 import { createTeddyBear, type TeddyRig } from './teddyBuilder';
 import { createTextureBundle } from './textures';
 import {
@@ -47,10 +48,12 @@ export class BloomingLoveScene {
 
   private bouquet!: BouquetRig;
   private teddy!: TeddyRig;
+  private pikachu!: PikachuRig;
   private envelope!: EnvelopeRig;
   private particles!: ParticleSystem;
   private bouquetShadow!: THREE.Mesh;
   private teddyShadow!: THREE.Mesh;
+  private pikachuShadow!: THREE.Mesh;
 
   private hemiLight!: THREE.HemisphereLight;
   private keyLight!: THREE.DirectionalLight;
@@ -70,6 +73,7 @@ export class BloomingLoveScene {
   private masterTl: gsap.core.Timeline | null = null;
   private hugTween: gsap.core.Tween | null = null;
   private kissTween: gsap.core.Tween | null = null;
+  private sparkTween: gsap.core.Tween | null = null;
   private lastTeddyTapAt = 0;
 
   private raycaster = new THREE.Raycaster();
@@ -157,8 +161,13 @@ export class BloomingLoveScene {
     this.teddy.root.visible = false;
     this.scene.add(this.teddy.root);
 
+    this.pikachu = createPikachu(this.textures);
+    this.pikachu.root.position.set(-6.5, 0, 0.22);
+    this.pikachu.root.visible = false;
+    this.scene.add(this.pikachu.root);
+
     this.envelope = createEnvelope(this.textures);
-    this.envelope.root.position.set(0, 0.008, 0.78);
+    this.envelope.root.position.set(0.56, 0.008, 0.86);
     this.envelope.root.rotation.y = 0.08;
     this.scene.add(this.envelope.root);
 
@@ -180,6 +189,11 @@ export class BloomingLoveScene {
     this.teddyShadow.position.set(6.5, 0.008, 0.12);
     this.teddyShadow.scale.setScalar(0.85);
     this.scene.add(this.teddyShadow);
+
+    this.pikachuShadow = new THREE.Mesh(shadowGeo, this.shadowMat.clone());
+    this.pikachuShadow.position.set(-6.5, 0.008, 0.22);
+    this.pikachuShadow.scale.setScalar(0.75);
+    this.scene.add(this.pikachuShadow);
 
     // Floating Petals, Sparkles & Hug Hearts
     this.particles = createParticleSystem(this.textures);
@@ -319,13 +333,28 @@ export class BloomingLoveScene {
     const tanHalfV = Math.tan(vFovRad / 2);
     const tanHalfH = tanHalfV * aspect;
 
-    // Final side-by-side positions (LEFT: Bouquet, RIGHT: Teddy Bear)
-    const bouquetX = isMobile ? -0.92 : -1.38;
-    const teddyX = isMobile ? 0.92 : 1.38;
-    const bouquetScale = isMobile ? 0.92 : 1.0;
-    const teddyScale = isMobile ? 0.94 : 1.0;
+    // Final presentation positions (LEFT: Pikachu, CENTER-LEFT: Bouquet, FRONT: Envelope, RIGHT: Teddy)
+    const pikachuX = isMobile ? -1.42 : -1.96;
+    const bouquetX = isMobile ? -0.2 : -0.38;
+    const teddyX = isMobile ? 1.26 : 1.56;
+    const envelopeX = isMobile ? 0.48 : 0.56;
+    const pikachuScale = isMobile ? 0.86 : 0.94;
+    const bouquetScale = isMobile ? 0.88 : 1.0;
+    const teddyScale = isMobile ? 0.88 : 1.0;
 
-    return { aspect, isMobile, tanHalfV, tanHalfH, bouquetX, teddyX, bouquetScale, teddyScale };
+    return {
+      aspect,
+      isMobile,
+      tanHalfV,
+      tanHalfH,
+      pikachuX,
+      bouquetX,
+      teddyX,
+      envelopeX,
+      pikachuScale,
+      bouquetScale,
+      teddyScale,
+    };
   }
 
   private frameVerticalBand(
@@ -379,12 +408,12 @@ export class BloomingLoveScene {
       return this.frameVerticalBand(0.05, 3.6, -0.66, 0.72, isMobile ? 1.55 : 1.9, 0.75);
     }
 
-    // 'teddy' & 'final' — Frame BOTH Bouquet (LEFT) and Teddy (RIGHT) with zero top cropping!
-    // When love note is visible, sit objects cleanly in upper ~58% above the bottom keepsake card.
+    // 'teddy' & 'final' — Frame Pikachu (LEFT), Bouquet (CENTER-LEFT), Envelope, and Teddy (RIGHT)
+    // with zero horizontal or top cropping!
     const showingNote = stage === 'final' ? this.noteVisible : true;
     const ndcBot = showingNote ? (isMobile ? -0.06 : -0.14) : -0.68;
     const ndcTop = showingNote ? 0.76 : 0.78;
-    const halfW = isMobile ? 2.08 : 2.78;
+    const halfW = isMobile ? 2.15 : 2.98;
     const camYOffset = showingNote ? 1.35 : 0.95;
 
     return this.frameVerticalBand(0.0, 3.62, ndcBot, ndcTop, halfW, camYOffset);
@@ -400,6 +429,9 @@ export class BloomingLoveScene {
         this.bouquet.bouquetGroup.scale.setScalar(layout.bouquetScale);
         this.teddy.root.position.x = layout.teddyX;
         this.teddy.root.scale.setScalar(layout.teddyScale);
+        this.pikachu.root.position.x = layout.pikachuX;
+        this.pikachu.root.scale.setScalar(layout.pikachuScale);
+        this.envelope.root.position.x = layout.envelopeX;
       } else if (this.stage === 'final') {
         gsap.to(this.bouquet.bouquetGroup.position, {
           x: layout.bouquetX,
@@ -422,6 +454,23 @@ export class BloomingLoveScene {
           x: layout.teddyScale,
           y: layout.teddyScale,
           z: layout.teddyScale,
+          duration: 0.6,
+          ease: 'power2.out',
+        });
+        gsap.to(this.pikachu.root.position, {
+          x: layout.pikachuX,
+          duration: 0.6,
+          ease: 'power2.out',
+        });
+        gsap.to(this.pikachu.root.scale, {
+          x: layout.pikachuScale,
+          y: layout.pikachuScale,
+          z: layout.pikachuScale,
+          duration: 0.6,
+          ease: 'power2.out',
+        });
+        gsap.to(this.envelope.root.position, {
+          x: layout.envelopeX,
           duration: 0.6,
           ease: 'power2.out',
         });
@@ -722,6 +771,18 @@ export class BloomingLoveScene {
         this.teddy.state.heartLift = 0.7;
         this.teddy.state.waveAmount = 0;
 
+        this.pikachu.root.visible = true;
+        this.pikachu.root.position.set(layout.pikachuX - 4.2, 0, 0.22);
+        this.pikachu.root.scale.setScalar(layout.pikachuScale);
+        this.pikachu.root.rotation.y = 0.65;
+        this.pikachu.state.hopWeight = 0;
+        this.pikachu.state.hopCycle = 0;
+        this.pikachu.state.sitProgress = 0;
+        this.pikachu.state.waveAmount = 0;
+        this.pikachu.state.sparkPulse = 0;
+
+        this.envelope.root.position.x = layout.envelopeX;
+
         gsap.to(this.camRig, {
           x: f.pos[0],
           y: f.pos[1],
@@ -733,7 +794,7 @@ export class BloomingLoveScene {
           ease: 'power2.inOut',
         });
 
-        // Bouquet glides gracefully to the LEFT side
+        // Bouquet glides gently into its balanced center-left spot
         gsap.to(this.bouquet.bouquetGroup.position, {
           x: layout.bouquetX,
           duration: 1.75,
@@ -751,7 +812,7 @@ export class BloomingLoveScene {
       assemblyEnd
     );
 
-    // Teddy walks/bounces in from the right
+    // Teddy walks in from the right & Pikachu hops happily in from the left!
     tl.to(
       this.teddy.state,
       {
@@ -789,7 +850,44 @@ export class BloomingLoveScene {
       assemblyEnd + 1.0
     );
 
-    // Teddy slows to a stop, faces front, sits down beside bouquet, presents pink heart & waves
+    tl.to(
+      this.pikachu.state,
+      {
+        hopWeight: 1,
+        duration: 0.3,
+        ease: 'power1.out',
+      },
+      assemblyEnd + 0.4
+    );
+    tl.to(
+      this.pikachu.state,
+      {
+        hopCycle: Math.PI * 5,
+        duration: 2.3,
+        ease: 'none',
+      },
+      assemblyEnd + 0.4
+    );
+    tl.to(
+      this.pikachu.root.position,
+      {
+        x: () => this.getResponsiveLayout().pikachuX,
+        duration: 2.3,
+        ease: 'power1.inOut',
+      },
+      assemblyEnd + 0.4
+    );
+    tl.to(
+      this.pikachuShadow.material,
+      {
+        opacity: 0.36,
+        duration: 1.2,
+        ease: 'power2.out',
+      },
+      assemblyEnd + 1.0
+    );
+
+    // Teddy & Pikachu slow to a stop, face front, sit down beside bouquet & wave warmly
     const sitStart = assemblyEnd + 2.65;
     tl.to(
       this.teddy.state,
@@ -819,7 +917,36 @@ export class BloomingLoveScene {
       },
       sitStart + 0.15
     );
-    // Cute welcoming wave
+
+    tl.to(
+      this.pikachu.state,
+      {
+        hopWeight: 0,
+        duration: 0.35,
+        ease: 'power2.out',
+      },
+      sitStart
+    );
+    tl.to(
+      this.pikachu.root.rotation,
+      {
+        y: 0.22,
+        duration: 0.85,
+        ease: 'power2.out',
+      },
+      sitStart
+    );
+    tl.to(
+      this.pikachu.state,
+      {
+        sitProgress: 1,
+        duration: 0.85,
+        ease: 'power2.inOut',
+      },
+      sitStart + 0.15
+    );
+
+    // Cute welcoming waves from both companions
     tl.to(
       this.teddy.state,
       {
@@ -837,6 +964,24 @@ export class BloomingLoveScene {
         ease: 'power2.inOut',
       },
       sitStart + 2.4
+    );
+    tl.to(
+      this.pikachu.state,
+      {
+        waveAmount: 1,
+        duration: 0.55,
+        ease: 'power2.out',
+      },
+      sitStart + 1.15
+    );
+    tl.to(
+      this.pikachu.state,
+      {
+        waveAmount: 0,
+        duration: 0.65,
+        ease: 'power2.inOut',
+      },
+      sitStart + 2.45
     );
 
     // =========================================================================
@@ -1042,6 +1187,30 @@ export class BloomingLoveScene {
     });
   }
 
+  public triggerPikachuSpark(): void {
+    this.particles.triggerHugBurst(false);
+    this.callbacks.onPikachuTap?.();
+
+    if (this.sparkTween) this.sparkTween.kill();
+    this.pikachu.state.sparkPulse = 0;
+    this.sparkTween = gsap.to(this.pikachu.state, {
+      sparkPulse: 1,
+      duration: 0.28,
+      yoyo: true,
+      repeat: 3,
+      ease: 'sine.inOut',
+    });
+
+    gsap.to(this.pikachu.state, {
+      waveAmount: 0.9,
+      duration: 0.32,
+      yoyo: true,
+      repeat: 1,
+      repeatDelay: 0.7,
+      ease: 'power2.inOut',
+    });
+  }
+
   private resetObjects(): void {
     this.bouquet.bouquetGroup.position.set(0, 0, 0);
     this.bouquet.bouquetGroup.rotation.set(0, 0, 0);
@@ -1070,6 +1239,7 @@ export class BloomingLoveScene {
 
     (this.bouquetShadow.material as THREE.MeshBasicMaterial).opacity = 0;
     (this.teddyShadow.material as THREE.MeshBasicMaterial).opacity = 0;
+    (this.pikachuShadow.material as THREE.MeshBasicMaterial).opacity = 0;
     this.teddy.root.visible = false;
     this.teddy.state.walkCycle = 0;
     this.teddy.state.walkWeight = 0;
@@ -1078,6 +1248,13 @@ export class BloomingLoveScene {
     this.teddy.state.heartLift = 1;
     this.teddy.state.hugPulse = 0;
     this.teddy.state.kissPulse = 0;
+
+    this.pikachu.root.visible = false;
+    this.pikachu.state.hopCycle = 0;
+    this.pikachu.state.hopWeight = 0;
+    this.pikachu.state.sitProgress = 0;
+    this.pikachu.state.waveAmount = 0;
+    this.pikachu.state.sparkPulse = 0;
 
     this.envelope.state.visibleScale = 0;
     this.envelope.state.openProgress = 0;
@@ -1124,10 +1301,14 @@ export class BloomingLoveScene {
       this.bouquet.bouquetGroup.rotation.y = Math.sin(this.elapsed * 0.55) * 0.06 + 0.14;
     }
 
-    // Update Teddy pose & contact shadow tracking
+    // Update Teddy & Pikachu poses & contact shadow tracking
     if (this.teddy.root.visible) {
       this.teddy.updatePose(this.elapsed);
       this.teddyShadow.position.x = this.teddy.root.position.x;
+    }
+    if (this.pikachu.root.visible) {
+      this.pikachu.updatePose(this.elapsed);
+      this.pikachuShadow.position.x = this.pikachu.root.position.x;
     }
     this.bouquetShadow.position.x = this.bouquet.bouquetGroup.position.x;
 
@@ -1203,7 +1384,16 @@ export class BloomingLoveScene {
       return;
     }
 
-    // 3. Check Individual Tulips for shade-specific romantic whispers
+    // 3. Check Plush Pikachu (cheerful bounce & glowing cheeks!)
+    if (this.pikachu.root.visible) {
+      const pikaHits = this.raycaster.intersectObject(this.pikachu.root, true);
+      if (pikaHits.length > 0) {
+        this.triggerPikachuSpark();
+        return;
+      }
+    }
+
+    // 4. Check Individual Tulips for shade-specific romantic whispers
     let closestTulip = null;
     let closestDist = Infinity;
     for (const tulip of this.bouquet.tulips) {
@@ -1239,7 +1429,7 @@ export class BloomingLoveScene {
       return;
     }
 
-    // 4. Fallback: clicking wrapping/stems gently sways the bouquet & swirls petals
+    // 5. Fallback: clicking wrapping/stems gently sways the bouquet & swirls petals
     const bouquetHits = this.raycaster.intersectObject(this.bouquet.bouquetGroup, true);
     if (bouquetHits.length > 0) {
       this.particles.triggerHugBurst(false);
@@ -1284,6 +1474,7 @@ export class BloomingLoveScene {
     if (this.masterTl) this.masterTl.kill();
     if (this.hugTween) this.hugTween.kill();
     if (this.kissTween) this.kissTween.kill();
+    if (this.sparkTween) this.sparkTween.kill();
 
     window.removeEventListener('resize', this.handleResize);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
@@ -1294,12 +1485,14 @@ export class BloomingLoveScene {
     this.controls.dispose();
     this.bouquet.dispose();
     this.teddy.dispose();
+    this.pikachu.dispose();
     this.envelope.dispose();
     this.particles.dispose();
     this.textures.dispose();
     this.envRT?.dispose();
     (this.bouquetShadow.material as THREE.Material).dispose();
     (this.teddyShadow.material as THREE.Material).dispose();
+    (this.pikachuShadow.material as THREE.Material).dispose();
     this.shadowMat.dispose();
     this.disposables.forEach((d) => d.dispose());
 
